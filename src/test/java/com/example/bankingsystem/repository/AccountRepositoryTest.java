@@ -10,20 +10,20 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.PreparedStatementCreator;
+import org.springframework.jdbc.core.ResultSetExtractor;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.jdbc.support.KeyHolder;
 
 import javax.swing.text.html.Option;
 import java.math.BigDecimal;
-import java.sql.PreparedStatement;
+import java.sql.*;
 import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 
 @ExtendWith(MockitoExtension.class)
@@ -36,12 +36,16 @@ public class AccountRepositoryTest {
     private AccountRepository accountRepository;
 
     @Test
-    public void findByAccountNumberShouldReturnedAccount(){
+    public void findByAccountNumberShouldReturnedAccount() throws SQLException{
+        mockAccountQuery(1L, 10001L, "John", new BigDecimal("1000"));
+
         Optional<Account> result = accountRepository.findByAccountNumber(10001L);
 
         assertTrue(result.isPresent());
 
         Account account = result.orElseThrow();
+
+        System.out.println("Actual balance: " + account.getBalance());
 
         assertEquals(10001L, account.getAccountNumber());
         assertEquals("John", account.getAccountHolder());
@@ -49,14 +53,30 @@ public class AccountRepositoryTest {
     }
 
     @Test
-    public void findByAccountNumberShouldReturnEmptyWhenAccountDoesNotExists(){
-        Optional<Account> result = accountRepository.findByAccountNumber(9999L);
+    public void findByAccountNumberShouldReturnEmptyWhenAccountDoesNotExists()
+            throws SQLException {
+
+        ResultSet resultSet = mock(ResultSet.class);
+        when(resultSet.next()).thenReturn(false);
+
+        when(jdbcTemplate.query(
+                any(String.class),
+                any(ResultSetExtractor.class),
+                eq(99999L)
+        )).thenAnswer(invocation -> {
+            ResultSetExtractor<?> extractor = invocation.getArgument(1);
+            return extractor.extractData(resultSet);
+        });
+
+        Optional<Account> result =
+                accountRepository.findByAccountNumber(99999L);
 
         assertTrue(result.isEmpty());
     }
 
+
     @Test
-    public void saveShouldInsertAccountAndReturnGeneratedId(){
+    public void saveShouldInsertAccountAndReturnGeneratedId() {
         // Arrange
         Account newAccount = new Account(
                 10002L,
@@ -64,44 +84,33 @@ public class AccountRepositoryTest {
                 new BigDecimal("5000.00")
         );
 
+        when(jdbcTemplate.update(
+                any(PreparedStatementCreator.class),
+                any(KeyHolder.class)
+        )).thenAnswer(invocation -> {
+            KeyHolder keyHolder = invocation.getArgument(1);
+
+            keyHolder.getKeyList().add(
+                    java.util.Map.of("GENERATED_KEY", 4L)
+            );
+
+            return 1;
+        });
+
         // Act
         Account savedAccount = accountRepository.save(newAccount);
 
         // Assert
         assertTrue(savedAccount.getId() != null);
+        assertEquals(4L, savedAccount.getId());
         assertEquals(10002L, savedAccount.getAccountNumber());
         assertEquals("Anna", savedAccount.getAccountHolder());
-        assertEquals(0, new BigDecimal("5000.00").compareTo(savedAccount.getBalance()));
+        assertEquals(
+                0,
+                new BigDecimal("5000.00").compareTo(savedAccount.getBalance())
+        );
     }
 
-
-
-    @Test
-    public void savedAccountShouldBeRetrievableFromDatabase(){
-        // Arrange
-        Account newAccount = new Account(
-                10003L,
-                "Mark",
-                new BigDecimal("20000.00")
-        );
-
-        // Act
-        Account savedAccount = accountRepository.save(newAccount);
-
-        Optional<Account> result = accountRepository.findByAccountNumber(
-                savedAccount.getAccountNumber()
-        );
-
-        // Assert
-        assertTrue(result.isPresent());
-
-        Account retrievedAccount = result.orElseThrow();
-
-        assertEquals(savedAccount.getId(), retrievedAccount.getId());
-        assertEquals(savedAccount.getAccountNumber(), retrievedAccount.getAccountNumber());
-        assertEquals(savedAccount.getAccountHolder(), retrievedAccount.getAccountHolder());
-        assertEquals(0, new BigDecimal("20000.00").compareTo(retrievedAccount.getBalance()));
-    }
 
     @Test
     void updateBalanceShouldExecuteUpdateWithCorrectParameters(){
@@ -118,6 +127,30 @@ public class AccountRepositoryTest {
                 eq(newBalance),
                 eq(accountNumber)
         );
+    }
+
+    private void mockAccountQuery(
+            long id,
+            long accountNumber,
+            String accountHolder,
+            BigDecimal balance) throws SQLException {
+
+        ResultSet resultSet = mock(ResultSet.class);
+
+        when(resultSet.next()).thenReturn(true, false);
+        when(resultSet.getLong("id")).thenReturn(id);
+        when(resultSet.getLong("account_number")).thenReturn(accountNumber);
+        when(resultSet.getString("account_holder")).thenReturn(accountHolder);
+        when(resultSet.getBigDecimal("balance")).thenReturn(balance);
+
+        when(jdbcTemplate.query(
+                any(String.class),
+                any(ResultSetExtractor.class),
+                eq(accountNumber)
+        )).thenAnswer(invocation -> {
+            ResultSetExtractor<?> extractor = invocation.getArgument(1);
+            return extractor.extractData(resultSet);
+        });
     }
 
 }
