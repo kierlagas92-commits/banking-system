@@ -87,7 +87,6 @@ public class BankService {
         accountRepository.updateBalance(fromAccountNumber, fromAccount.getBalance());
         accountRepository.updateBalance(toAccountNumber, toAccount.getBalance());
 
-
     }
 
 

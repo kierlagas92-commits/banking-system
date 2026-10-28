@@ -829,6 +829,54 @@ public class BankServiceTest {
                 new BigDecimal("300.00").compareTo(david.getBalance())
         );
 
+    }
+
+    @Test
+    void transferShouldPropagateExceptionWhenDestinationBalanceUpdateFails(){
+        long annaAccountNumber = 10004L;
+        long davidAccountNumber = 10005;
+
+        Account anna = new Account(
+                4L,
+                annaAccountNumber,
+                "Anna",
+                new BigDecimal("500.00")
+        );
+
+        Account david = new Account(
+                5L,
+                davidAccountNumber,
+                "David",
+                new BigDecimal("300.00")
+        );
+
+        when(accountRepository.findByAccountNumber(annaAccountNumber))
+                .thenReturn(Optional.of(anna));
+
+        when(accountRepository.findByAccountNumber(davidAccountNumber))
+                .thenReturn(Optional.of(david));
+
+        // Simulate the receiver's database update falling
+        doNothing()
+                .doThrow(new RuntimeException("Database update failed"))
+                .when(accountRepository)
+                .updateBalance(anyLong(), any(BigDecimal.class));
+
+        RuntimeException exception = assertThrows(
+                RuntimeException.class,
+                () -> bankService.transfer(
+                        annaAccountNumber,
+                        davidAccountNumber,
+                        new BigDecimal("100.00")
+                )
+        );
+
+        assertEquals("Database update failed", exception.getMessage());
+
+        // Confirm both update attempts occurred.
+        verify(accountRepository, times(2))
+                .updateBalance(anyLong(), any(BigDecimal.class));
+
 
     }
 
