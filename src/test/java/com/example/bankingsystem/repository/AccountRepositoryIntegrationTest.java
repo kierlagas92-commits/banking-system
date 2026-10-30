@@ -153,5 +153,44 @@ public class AccountRepositoryIntegrationTest {
 
     }
 
+    @Test
+    void transferShouldFailWhenDestinationAccountDoesntExists(){
+        // Arrange
+
+        // ===== Create the data source =====
+        jdbcTemplate.update(
+                "DELETE FROM accounts WHERE account_number = ?",
+                10006L
+        );
+
+        accountRepository.save(
+                new Account(10006L, "David", new BigDecimal("500.00"))
+        );
+
+        // Act + Assert: Destination account does not exists
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> bankService.transfer(
+                        10006L,
+                        99999L,
+                        new BigDecimal("100.00")
+                )
+        );
+
+        // ===== Verify: source account balance remains unchanged =====
+        BigDecimal davidBalance = jdbcTemplate.queryForObject(
+                "SELECT balance FROM accounts WHERE account_number = ? ",
+                BigDecimal.class,
+                10006L
+        );
+
+        assertEquals(
+                0,
+                new BigDecimal("500.00").compareTo(davidBalance)
+        );
+
+
+    }
+
 
 }
