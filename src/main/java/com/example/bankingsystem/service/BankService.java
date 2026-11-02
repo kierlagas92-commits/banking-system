@@ -1,6 +1,8 @@
 package com.example.bankingsystem.service;
 
 import com.example.bankingsystem.model.Account;
+import com.example.bankingsystem.model.TransferAudit;
+import com.example.bankingsystem.model.TransferStatus;
 import com.example.bankingsystem.repository.AccountRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -9,10 +11,16 @@ import java.math.BigDecimal;
 
 @Service
 public class BankService {
-    private final AccountRepository accountRepository;
 
-    public BankService(AccountRepository accountRepository){
+    private final AccountRepository accountRepository;
+    private final TransferServiceAudit transferServiceAudit;
+
+    public BankService(
+            AccountRepository accountRepository,
+            TransferServiceAudit transferServiceAudit
+    ){
         this.accountRepository = accountRepository;
+        this.transferServiceAudit = transferServiceAudit;
     }
 
     public Account findAccountByAccountNumber(long accountNumber){
@@ -63,29 +71,58 @@ public class BankService {
             BigDecimal amount
     ){
 
-        if(fromAccountNumber == toAccountNumber){
-            throw new IllegalArgumentException(
-                    "Source and Destination account must be different"
+        try {
+
+            if(fromAccountNumber == toAccountNumber){
+                throw new IllegalArgumentException(
+                        "Source and Destination account must be different"
+                );
+            }
+
+            Account fromAccount = accountRepository.findByAccountNumber(fromAccountNumber)
+                    .orElseThrow(() -> new IllegalArgumentException(
+                            "Account not found: " + fromAccountNumber
+                    ));
+
+            Account toAccount = accountRepository.findByAccountNumber(toAccountNumber)
+                    .orElseThrow(() -> new IllegalArgumentException(
+                            "Account not found: " + toAccountNumber
+                    ));
+
+            // processing changes
+            fromAccount.withdraw(amount);
+            toAccount.deposit(amount);
+
+            // Update the repository
+            accountRepository.updateBalance(fromAccountNumber, fromAccount.getBalance());
+            accountRepository.updateBalance(toAccountNumber, toAccount.getBalance());
+
+            TransferAudit audit = new TransferAudit(
+                    fromAccountNumber,
+                    toAccountNumber,
+                    amount,
+                    TransferStatus.SUCCESS,
+                    "Transfer completed successfully"
             );
+
+            transferServiceAudit.recordSuccessfulTransfer(audit);
+        } catch (RuntimeException e) {
+            try {
+                TransferAudit audit = new TransferAudit(
+                        fromAccountNumber,
+                        toAccountNumber,
+                        amount,
+                        TransferStatus.FAILED,
+                        e.getMessage()
+                );
+
+                transferServiceAudit.recordFailedTransfer(audit);
+            } catch (RuntimeException auditException){
+                e.addSuppressed(auditException);
+            }
+
+            throw e;
         }
-
-        Account fromAccount = accountRepository.findByAccountNumber(fromAccountNumber)
-                .orElseThrow(() -> new IllegalArgumentException(
-                        "Account not found: " + fromAccountNumber
-                ));
-
-        Account toAccount = accountRepository.findByAccountNumber(toAccountNumber)
-                .orElseThrow(() -> new IllegalArgumentException(
-                        "Account not found: " + toAccountNumber
-                ));
-
-        // processing changes
-        fromAccount.withdraw(amount);
-        toAccount.deposit(amount);
-
-        // Update the repository
-        accountRepository.updateBalance(fromAccountNumber, fromAccount.getBalance());
-        accountRepository.updateBalance(toAccountNumber, toAccount.getBalance());
 
     }
 

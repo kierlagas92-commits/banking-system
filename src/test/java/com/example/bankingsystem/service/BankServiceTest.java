@@ -28,6 +28,9 @@ public class BankServiceTest {
     @Mock
     private AccountRepository accountRepository;
 
+    @Mock
+    private TransferServiceAudit transferServiceAudit;
+
     @InjectMocks
     private BankService bankService;
 

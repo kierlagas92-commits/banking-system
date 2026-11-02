@@ -48,6 +48,16 @@ public class AccountRepositoryIntegrationTest {
                 10005L,
                 10006L
         );
+
+        jdbcTemplate.update(
+                """
+                DELETE FROM transfer_audit
+                WHERE from_account IN (?, ?, ?, ?)
+                   OR to_account IN (?, ?, ?, ?)
+                """,
+                10003L, 10004L, 10005L, 10006L,
+                10003L, 10004L, 10005L, 10006L
+        );
     }
 
 
@@ -108,6 +118,11 @@ public class AccountRepositoryIntegrationTest {
                 10004L, 10005L
         );
 
+        jdbcTemplate.update(
+                "DELETE FROM transfer_audit WHERE from_account = ? AND to_account = ?",
+                10004L, 10005L
+        );
+
         Account anna = accountRepository.save(
                 new Account(10004L, "Anna", new BigDecimal("500.00"))
         );
@@ -151,6 +166,20 @@ public class AccountRepositoryIntegrationTest {
         assertEquals(0, new BigDecimal("500.00").compareTo(annaBalance));
         assertEquals(0, new BigDecimal("300.00").compareTo(davidBalance));
 
+        // === This will be a test for the Transfer
+        String auditStatus = jdbcTemplate.queryForObject(
+                """
+                        SELECT status
+                        FROM transfer_audit
+                        WHERE from_account = ? AND to_account = ?    
+                    """,
+                String.class,
+                10004L,
+                10005L
+        );
+
+        assertEquals("FAILED", auditStatus);
+
     }
 
     @Test
@@ -192,5 +221,62 @@ public class AccountRepositoryIntegrationTest {
 
     }
 
+    @Test
+    void successfulTransferShouldCreateAudit(){
+        // Arrange: clean previous data
+        jdbcTemplate.update(
+                "DELETE FROM accounts WHERE account_number IN (?, ?)",
+                10004L, 10005L
+        );
+
+        jdbcTemplate.update(
+                "DELETE FROM transfer_audit WHERE from_account = ? AND to_account = ?",
+                10004L, 10005L
+        );
+
+        accountRepository.save(
+                new Account(10004L, "Anna", new BigDecimal("500.00"))
+        );
+
+        accountRepository.save(
+                new Account(10005L, "David", new BigDecimal("300.00"))
+        );
+
+        // Act
+        bankService.transfer(
+                10004L,
+                10005L,
+                new BigDecimal("100.00")
+        );
+
+        // Assert: verify audit status
+        String auditStatus = jdbcTemplate.queryForObject(
+                """
+                        SELECT status
+                        FROM transfer_audit
+                        WHERE from_account = ? and to_account = ?
+                        """,
+                String.class,
+                10004L,
+                10005L
+        );
+
+        assertEquals("SUCCESS", auditStatus);
+
+        BigDecimal annaBalance = jdbcTemplate.queryForObject(
+                "SELECT balance FROM accounts WHERE account_number = ?",
+                BigDecimal.class,
+                10004L
+        );
+
+        BigDecimal davidBalance = jdbcTemplate.queryForObject(
+                "SELECT balance FROM accounts WHERE account_number = ?",
+                BigDecimal.class,
+                10005L
+        );
+
+        assertEquals(0, new BigDecimal("400.00").compareTo(annaBalance));
+        assertEquals(0, new BigDecimal("400.00").compareTo(davidBalance));
+    }
 
 }
