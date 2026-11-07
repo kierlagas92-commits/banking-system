@@ -1,5 +1,6 @@
 package com.example.bankingsystem.service;
 
+import com.example.bankingsystem.exception.AccountNotFoundException;
 import com.example.bankingsystem.model.Account;
 import com.example.bankingsystem.model.TransferAudit;
 import com.example.bankingsystem.model.TransferStatus;
@@ -26,7 +27,7 @@ public class BankService {
     public Account findAccountByAccountNumber(long accountNumber){
         return accountRepository.findByAccountNumber(accountNumber)
                 .orElseThrow(() ->
-                        new IllegalArgumentException("Account not found!"));
+                        new AccountNotFoundException("Account not found"));
     }
 
     public Account createAccount(
@@ -80,12 +81,12 @@ public class BankService {
             }
 
             Account fromAccount = accountRepository.findByAccountNumber(fromAccountNumber)
-                    .orElseThrow(() -> new IllegalArgumentException(
+                    .orElseThrow(() -> new AccountNotFoundException(
                             "Account not found: " + fromAccountNumber
                     ));
 
             Account toAccount = accountRepository.findByAccountNumber(toAccountNumber)
-                    .orElseThrow(() -> new IllegalArgumentException(
+                    .orElseThrow(() -> new AccountNotFoundException(
                             "Account not found: " + toAccountNumber
                     ));
 

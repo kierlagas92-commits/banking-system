@@ -1,5 +1,6 @@
 package com.example.bankingsystem.repository;
 
+import com.example.bankingsystem.exception.AccountNotFoundException;
 import com.example.bankingsystem.model.Account;
 import com.example.bankingsystem.service.BankService;
 import org.junit.jupiter.api.AfterEach;
@@ -198,7 +199,7 @@ public class AccountRepositoryIntegrationTest {
 
         // Act + Assert: Destination account does not exists
         assertThrows(
-                IllegalArgumentException.class,
+                AccountNotFoundException.class,
                 () -> bankService.transfer(
                         10006L,
                         99999L,

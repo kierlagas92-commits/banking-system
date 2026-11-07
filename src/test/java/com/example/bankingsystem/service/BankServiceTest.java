@@ -1,5 +1,6 @@
 package com.example.bankingsystem.service;
 
+import com.example.bankingsystem.exception.AccountNotFoundException;
 import com.example.bankingsystem.model.Account;
 import com.example.bankingsystem.repository.AccountRepository;
 import org.junit.jupiter.api.Test;
@@ -57,53 +58,10 @@ public class BankServiceTest {
         when(accountRepository.findByAccountNumber(9999L))
                 .thenReturn(Optional.empty());
 
-        assertThrows(IllegalArgumentException.class, () -> bankService.findAccountByAccountNumber(9999L));
+        assertThrows(
+                AccountNotFoundException.class,
+                () -> bankService.findAccountByAccountNumber(9999L));
     }
-
-//    @Test
-//    void createAccountShouldSaveAndReturnAccount(){
-//        Account account = new Account(
-//                10004L,
-//                "Anna",
-//                new BigDecimal("500.00")
-//        );
-//
-//        Account savedAccount = new Account(
-//                4L,
-//                10004L,
-//                "Anna",
-//                new BigDecimal("500.00")
-//        );
-//
-//        ArgumentCaptor<Account> captor = ArgumentCaptor.forClass(Account.class);
-//
-//        verify(accountRepository).save(captor.capture());
-//
-//        Account capturedAccount = captor.getValue();
-//
-//        when(accountRepository.save(any(Account.class)))
-//                .thenReturn(savedAccount);
-//
-//        Account result = bankService.createAccount(
-//                10004L,
-//                "Anna",
-//                new BigDecimal("500.00")
-//        );
-//
-//        assertEquals(10004L, capturedAccount.getAccountNumber());
-//        assertEquals("Anna", capturedAccount.getAccountHolder());
-//        assertEquals(
-//                0,
-//                new BigDecimal("500.00").compareTo(capturedAccount.getBalance())
-//        );
-//
-////        assertEquals(4L, result.getId());
-////        assertEquals(10004L, result.getAccountNumber());
-////        assertEquals("Anna", result.getAccountHolder());
-////        assertEquals(0, new BigDecimal("500.00").compareTo(result.getBalance()));
-//
-////        verify(accountRepository).save(any(Account.class));
-//    }
 
 
 
@@ -634,8 +592,8 @@ public class BankServiceTest {
                 .thenReturn(Optional.empty());
 
         // Act and Assert
-        IllegalArgumentException exception = assertThrows(
-                IllegalArgumentException.class,
+        AccountNotFoundException exception = assertThrows(
+                AccountNotFoundException.class,
                 () -> bankService.transfer(
                         annaAccountNumber,
                         missingAccountNumber,
